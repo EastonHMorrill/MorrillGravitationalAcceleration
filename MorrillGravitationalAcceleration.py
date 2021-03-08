@@ -1,36 +1,43 @@
 import math
-import ParticleClass as PC
+from ParticleClass import Particle
+import numpy as np
 
-x_0, y_0, z_0 = input("Where would you like to calculate gravitational force from? (x y z): ").split(" ")
-h = input("What is your time step?: ")
-  
-X = []
-Y = []
-Z = []
-M = []
-    
-inFile = open("particleSmall.txt", "r")
-for line in inFile:
-    x, y, z, m = line.split(" ")
-    X.append(float(x))
-    Y.append(float(y))
-    Z.append(float(z))
-    M.append(float(m))
-inFile.close()
+G = 6.67E-11
+h = 2E-6
 
-def GravPot(x, y, z, PC):
+def GravPot(pos, Particles, h):
     phi = 0.0
-    for p in PC:
-        r= math.sqrt((x_0 - p.x)**2 + (y_0 - p.y)**2 + (z_0 - p.z)**2)
-        phi += -G*p.m/r
+    for p in Particles:
+        r = math.sqrt((pos[0]-p.pos[0])**2 + (pos[1]-p.pos[1])**2 + (pos[2]-p.pos[2])**2)
+        if (r > h/2):
+            phi += -G*p.m/r
     return phi
 
-def GravDeriv(f, x, y, z, h):
-    ddx = (f(x+h/2, y, z)-f(x-h/2, y, z))/h
-    ddy = (f(x, y+h/2, z)-f(x, y-h/2, z))/h
-    ddz = (f(x, y, z+h/2)-f(x, y, z-h/2))/h
-    return ddx, ddy, ddz
+Particles = []
+inFile = open("particlesLarge.txt", "r")
+for line in inFile:
+    x, y, z, m = line.split(" ")
+    pos = np.array([float(x), float(y), float(z)])
+    p = Particle(pos, float(m))
+    Particles.append(p)
+inFile.close()
 
-f = GravPot(x, y, z, PC)
+def CentralDiffGrav(f, pos, h, i, Particles):
+    step = np.zeros(3)
+    step[i] = h/2
+    r_1 = pos - step
+    r_2 = pos + step
+    return (f(r_2, Particles, h)-f(r_1, Particles, h))/h
 
-print("The Gravitational Potential at " + x_0 + ", " + y_0 + ", " + z_0 + " is " + str(phi))
+# x, y, z = input("Where would you like to calculate gravitational force from? (x y z): ").split(" ")
+# pos = np.array([float(x), float(y), float(z)])
+
+outFile = open("particlesAccel.txt", "w")
+for p in Particles:
+    dfdx = -CentralDiffGrav(GravPot, p.pos, h, 0, Particles)
+    dfdy = -CentralDiffGrav(GravPot, p.pos, h, 1, Particles)
+    dfdz = -CentralDiffGrav(GravPot, p.pos, h, 2, Particles)
+    outFile.write(str(dfdx) + " " + str(dfdy) + " " + str(dfdz) + "\n")
+outFile.close()
+
+print("The Acceleration is: ", dfdx, ", ", dfdy, ", ", dfdz)
